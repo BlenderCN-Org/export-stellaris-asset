@@ -4,8 +4,8 @@ from bpy.types import Panel, Operator
 bl_info = {
     "name": "Stellaris .asset Exporter",
     "category": "Import-Export",
-    "author": "Oninoni (oninoni@oninoni.de), Dayshine",
-    "version": (0, 0, 2),
+    "author": "Dayshine, original by Oninoni (oninoni@oninoni.de)",
+    "version": (0, 0, 3),
     "blender": (2, 73, 0),
     "support": "COMMUNITY"
 }
@@ -31,7 +31,7 @@ def createLocator(object):
 def createAttach(object):
     return "attach = {" + object.name + "=\"YouNeedToAddTheMeshHere\"}"
 
-def main(context):
+def main(context, selectedonly, outputattach):
     selected = context.object
     others = context.visible_objects
     
@@ -39,33 +39,38 @@ def main(context):
     
     print(bpy.path.abspath("//") + "\STH_" + selected.name + ".asset")
     assetFile = open(bpy.path.abspath("//") + "STH_" + selected.name + ".asset","w")
-    assetFile.write("# Created by the .asset-Creator v0.0.2 written by Oninoni (oninoni@oninoni.de) and edited by Dayshine for Star Trek New Horizon\n\n")
+    assetFile.write("# Created by the .asset-Creator v"+ ".".join([str(i) for i in bl_info["version"]]) + " written by Oninoni (oninoni@oninoni.de) and edited by Dayshine for Star Trek New Horizon\n\n")
     
     for object in others:
         print(object.type)
         if(object.type == 'MESH' or object.type == "EMPTY"):
-            if(selected == object):
+            if(not selectedonly and selected == object):
                 continue
-            print("Sub: \"" + object.name + "\"")
-            print(createLocator(object))
-            assetFile.write(createLocator(object) + "\n")
-            print(createAttach(object))
-            assetFile.write(createAttach(object) + "\n\n")
+            if(not selectedonly or object.select):
+                print("Sub: \"" + object.name + "\"")
+                print(createLocator(object))
+                assetFile.write(createLocator(object) + "\n")
+                if(outputattach):
+                    print(createAttach(object))
+                    assetFile.write(createAttach(object) + "\n\n")
+                else:
+                    assetFile.write("\n")
         
     assetFile.close()
 
-class AssetExporterOperator(Operator):
-    """Tooltip"""
+class AssetExporterOperator(bpy.types.Operator):
+    """Export"""
     bl_idname = "object.asset_export"
-    bl_label = ".asset Exporter Operator"
-    
-    @classmethod
-    def poll(cls, context):
-        return True
+    bl_label = "Export"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    selected = bpy.props.BoolProperty(name="Only Selected")
+    attach = bpy.props.BoolProperty(name="Output 'Attach'")
 
     def execute(self, context):
-        main(context)
+        main(context, self.selected, self.attach)
         return {'FINISHED'}
+
 
 class ClausewitzAssetExporterPanel(Panel):
     bl_space_type = 'VIEW_3D'
@@ -73,20 +78,22 @@ class ClausewitzAssetExporterPanel(Panel):
     bl_label = 'Clausewitz Model Exporter'
     bl_context = 'objectmode'
     bl_category = 'Exporter'
-    
+
     #Add UI elements here
     def draw(self, context):
         layout = self.layout
         layout.row().label('To export select the MAIN Object!')
         layout.row().label('Currently Selected: ' + context.object.name)
         
-        layout.operator('object.asset_export', text='Export!')
+        layout.operator(AssetExporterOperator.bl_idname)
+
         
 
 #Register
 def register():
     bpy.utils.register_class(AssetExporterOperator)
     bpy.utils.register_class(ClausewitzAssetExporterPanel)
+    
 
 #Unregister
 def unregister():
